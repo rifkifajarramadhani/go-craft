@@ -1,0 +1,41 @@
+name: Full generated matrix
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  generate-and-build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        framework: [nethttp, fiber, gin, echo]
+        database: [mysql, postgres, sqlite]
+        queue: [none, database, redis]
+        scheduler: ['false', 'true']
+        exclude:
+          - { queue: none, scheduler: 'true' }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.4'
+          cache: true
+      - run: go build -o go-craft ./cmd/go-craft
+      - name: Generate
+        shell: bash
+        run: |
+          scheduler=()
+          if [[ '${{ matrix.scheduler }}' == 'true' ]]; then scheduler=(--scheduler); fi
+          ./go-craft new generated \
+            --module=example.com/generated \
+            --directory='${{ runner.temp }}' \
+            --framework='${{ matrix.framework }}' \
+            --database='${{ matrix.database }}' \
+            --queue='${{ matrix.queue }}' \
+            "${scheduler[@]}" \
+            --no-interaction
+      - working-directory: ${{ runner.temp }}/generated
+        run: go test ./...

@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  generator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.4'
+          cache: true
+      - run: go test ./...
+      - run: go vet ./...
+
+  generated-pairwise:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { framework: nethttp, database: mysql, queue: none, scheduler: '' }
+          - { framework: fiber, database: postgres, queue: database, scheduler: '' }
+          - { framework: gin, database: sqlite, queue: redis, scheduler: --scheduler }
+          - { framework: echo, database: mysql, queue: database, scheduler: --scheduler }
+          - { framework: nethttp, database: postgres, queue: redis, scheduler: '' }
+          - { framework: fiber, database: sqlite, queue: none, scheduler: '' }
+          - { framework: gin, database: mysql, queue: database, scheduler: --scheduler }
+          - { framework: echo, database: postgres, queue: none, scheduler: '' }
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.4'
+          cache: true
+      - run: go build -o go-craft ./cmd/go-craft
+      - run: >-
+          ./go-craft new generated
+          --module=example.com/generated
+          --directory=${{ runner.temp }}
+          --framework=${{ matrix.framework }}
+          --database=${{ matrix.database }}
+          --queue=${{ matrix.queue }}
+          ${{ matrix.scheduler }}
+          --no-interaction
+      - working-directory: ${{ runner.temp }}/generated
+        run: go test ./...
+      - working-directory: ${{ runner.temp }}/generated
+        run: go vet ./...
+
+  database-queue-integration:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: test-password
+          MYSQL_DATABASE: db_name
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -ptest-password"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: db_name
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d db_name"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.4'
+          cache: true
+      - run: go build -o go-craft ./cmd/go-craft
+      - run: >-
+          ./go-craft new mysql-project
+          --module=example.com/mysql-project
+          --directory=${{ runner.temp }}
+          --framework=fiber
+          --database=mysql
+          --queue=database
+          --no-interaction
+      - run: >-
+          ./go-craft new postgres-project
+          --module=example.com/postgres-project
+          --directory=${{ runner.temp }}
+          --framework=nethttp
+          --database=postgres
+          --queue=database
+          --no-interaction
+      - run: go install -tags 'mysql postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@v4.19.1
+      - run: migrate -database 'mysql://root:test-password@tcp(localhost:3306)/db_name' -path '${{ runner.temp }}/mysql-project/internal/adapter/mysql/migrations' up
+      - run: migrate -database 'postgres://postgres:test-password@localhost:5432/db_name?sslmode=disable' -path '${{ runner.temp }}/postgres-project/internal/adapter/postgres/migrations' up
+      - working-directory: ${{ runner.temp }}/mysql-project
+        env:
+          QUEUE_TEST_MYSQL_DSN: root:test-password@tcp(localhost:3306)/db_name?parseTime=true
+        run: go test ./internal/adapter/queue -run DatabaseQueue -count=1
+      - working-directory: ${{ runner.temp }}/postgres-project
+        env:
+          QUEUE_TEST_POSTGRES_DSN: host=localhost port=5432 user=postgres password=test-password dbname=db_name sslmode=disable
+        run: go test ./internal/adapter/queue -run PostgresDatabaseQueue -count=1

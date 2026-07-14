@@ -1,0 +1,12 @@
+internal/adapter/queue/database.go
+internal/adapter/queue/database_models.go
+internal/adapter/queue/database_test.go
+internal/adapter/queue/database_integration_test.go
+internal/adapter/queue/database_reservation.go
+internal/bootstrap/bootstrap.go
+internal/adapter/mysql/migrations/000003_create_queue_tables.up.sql
+internal/adapter/mysql/migrations/000003_create_queue_tables.down.sql
+internal/adapter/postgres/migrations/000003_create_queue_tables.up.sql
+internal/adapter/postgres/migrations/000003_create_queue_tables.down.sql
+internal/adapter/sqlite/migrations/000003_create_queue_tables.up.sql
+internal/adapter/sqlite/migrations/000003_create_queue_tables.down.sql
