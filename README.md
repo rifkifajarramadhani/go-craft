@@ -1,6 +1,6 @@
 # go-craft
 
-`go-craft` is an offline, composable generator for clean-architecture Go services. It embeds a versioned starter and emits only the selected HTTP, database, queue, and scheduler adapters.
+`go-craft` is an offline, composable generator for clean-architecture Go services. It embeds a versioned starter and emits only the selected HTTP, database, queue, search, and scheduler adapters.
 
 ## Install
 
@@ -24,11 +24,12 @@ go-craft new my-service \
   --framework=gin \
   --database=postgres \
   --queue=redis \
+  --search=elasticsearch \
   --scheduler \
   --no-interaction
 ```
 
-Choices are `nethttp|fiber|gin|echo`, `mysql|postgres|sqlite`, and `none|database|redis`. Fiber, MySQL, and the database queue are the defaults. A queue adds `worker`, `queue`, and `all`; `--scheduler` additionally adds `scheduler` and `schedule`.
+Choices are `nethttp|fiber|gin|echo`, `mysql|postgres|sqlite`, `none|database|redis` for queues, and `none|elasticsearch` for search. Fiber, MySQL, and the database queue are the defaults; search defaults to none. A queue adds `worker`, `queue`, and `all`; `--scheduler` additionally adds `scheduler` and `schedule`.
 
 The module path resolves from `--module`, then `--owner`, then the saved GitHub owner:
 
@@ -51,5 +52,4 @@ In the starter repository, `make template-pack` produces a deterministic, versio
 make check
 ```
 
-The scaffold test generates and structurally validates all 60 valid combinations. CI also compiles a pairwise matrix on every change and the full matrix nightly.
-
+The scaffold test generates and structurally validates all 120 valid combinations. CI also compiles a pairwise matrix on every change and the full matrix nightly.

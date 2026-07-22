@@ -9,44 +9,75 @@ import (
 	"testing"
 )
 
+func TestGenerateDefaultsSearchToNone(t *testing.T) {
+	result, err := Generate(context.Background(), Options{
+		Name: "default-search", Module: "example.com/default-search", Directory: t.TempDir(),
+		Framework: "nethttp", Database: "sqlite", Queue: "none", SkipTidy: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	metadata := readGenerated(t, result.Destination, ".go-craft.json")
+	if !strings.Contains(metadata, `"search": "none"`) {
+		t.Fatalf("metadata does not record default search selection: %s", metadata)
+	}
+	if _, err := os.Stat(filepath.Join(result.Destination, "internal/adapter/elasticsearch")); !os.IsNotExist(err) {
+		t.Fatalf("default project contains Elasticsearch adapter: %v", err)
+	}
+}
+
+func TestValidateRejectsUnknownSearchAdapter(t *testing.T) {
+	err := validate(Options{
+		Name: "invalid-search", Module: "example.com/invalid-search",
+		Framework: "nethttp", Database: "sqlite", Queue: "none", Search: "opensearch",
+	})
+	if err == nil || !strings.Contains(err.Error(), "unsupported search adapter") {
+		t.Fatalf("error = %v, want unsupported search adapter", err)
+	}
+}
+
 func TestGenerateAllValidVariants(t *testing.T) {
 	frameworks := []string{"nethttp", "fiber", "gin", "echo"}
 	databases := []string{"mysql", "postgres", "sqlite"}
 	queues := []string{"none", "database", "redis"}
+	searches := []string{"none", "elasticsearch"}
 	variant := 0
 
 	for _, framework := range frameworks {
 		for _, database := range databases {
 			for _, queue := range queues {
-				schedulers := []bool{false, true}
-				if queue == "none" {
-					schedulers = []bool{false}
-				}
+				for _, search := range searches {
+					schedulers := []bool{false, true}
+					if queue == "none" {
+						schedulers = []bool{false}
+					}
 
-				for _, scheduler := range schedulers {
-					variant++
-					name := fmt.Sprintf("variant-%02d", variant)
-					t.Run(name, func(t *testing.T) {
-						parent := t.TempDir()
-						options := Options{
-							Name: name, Module: "example.com/" + name, Directory: parent,
-							Framework: framework, Database: database, Queue: queue,
-							Scheduler: scheduler, SkipTidy: true,
-						}
-						result, err := Generate(context.Background(), options)
-						if err != nil {
-							t.Fatalf("generate: %v", err)
-						}
+					for _, scheduler := range schedulers {
+						variant++
+						name := fmt.Sprintf("variant-%03d", variant)
+						t.Run(name, func(t *testing.T) {
+							parent := t.TempDir()
+							options := Options{
+								Name: name, Module: "example.com/" + name, Directory: parent,
+								Framework: framework, Database: database, Queue: queue, Search: search,
+								Scheduler: scheduler, SkipTidy: true,
+							}
+							result, err := Generate(context.Background(), options)
+							if err != nil {
+								t.Fatalf("generate: %v", err)
+							}
 
-						assertSelection(t, result.Destination, options)
-					})
+							assertSelection(t, result.Destination, options)
+						})
+					}
 				}
 			}
 		}
 	}
 
-	if variant != 60 {
-		t.Fatalf("generated %d variants, want 60", variant)
+	if variant != 120 {
+		t.Fatalf("generated %d variants, want 120", variant)
 	}
 }
 
@@ -89,6 +120,16 @@ func assertSelection(t *testing.T, destination string, options Options) {
 	if options.Queue != "redis" && strings.Contains(goMod, "github.com/hibiken/asynq") {
 		t.Error("non-redis variant includes Asynq")
 	}
+
+	elasticsearchPath := filepath.Join(destination, "internal/adapter/elasticsearch")
+	_, elasticsearchErr := os.Stat(elasticsearchPath)
+	elasticsearchSelected := options.Search == "elasticsearch"
+	if (elasticsearchErr == nil) != elasticsearchSelected {
+		t.Errorf("Elasticsearch adapter presence does not match %q", options.Search)
+	}
+	if strings.Contains(goMod, "github.com/elastic/go-elasticsearch/v8") != elasticsearchSelected {
+		t.Errorf("Elasticsearch dependency presence does not match %q", options.Search)
+	}
 	queueMigration := filepath.Join(destination, "internal/adapter", options.Database, "migrations", "000003_create_queue_tables.up.sql")
 	_, migrationErr := os.Stat(queueMigration)
 	if (migrationErr == nil) != (options.Queue == "database") {
@@ -101,15 +142,31 @@ func assertSelection(t *testing.T, destination string, options Options) {
 	}
 
 	metadata := readGenerated(t, destination, ".go-craft.json")
+	if strings.Contains(metadata, `"search": "`+options.Search+`"`) == false {
+		t.Errorf("metadata does not contain search selection %q", options.Search)
+	}
 	for _, selection := range []string{options.Framework, options.Database, options.Queue} {
 		if !strings.Contains(metadata, `"`+selection+`"`) {
 			t.Errorf("metadata does not contain selection %q", selection)
 		}
 	}
 	readme := readGenerated(t, destination, "README.md")
-	for _, selection := range []string{options.Framework, options.Database, options.Queue} {
+	for _, selection := range []string{options.Framework, options.Database, options.Queue, options.Search} {
 		if !strings.Contains(readme, "`"+selection+"`") {
 			t.Errorf("README does not contain selection %q", selection)
+		}
+	}
+
+	config := readGenerated(t, destination, "configs/config.yaml")
+	compose := readGenerated(t, destination, "docker-compose.yml")
+	environment := readGenerated(t, destination, ".env.example")
+	for name, content := range map[string]string{"config": config, "compose": compose, "environment": environment} {
+		if strings.Contains(content, "ELASTICSEARCH") || strings.Contains(content, "elasticsearch:") {
+			if !elasticsearchSelected {
+				t.Errorf("%s contains Elasticsearch configuration for unselected adapter", name)
+			}
+		} else if elasticsearchSelected {
+			t.Errorf("%s does not contain selected Elasticsearch configuration", name)
 		}
 	}
 }

@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	TemplateVersion  = "0.1.0"
-	GeneratorVersion = "0.1.0"
+	TemplateVersion  = "0.2.0"
+	GeneratorVersion = "0.2.0"
 	baseModule       = "github.com/rifkifajarramadhani/golang-clean-architecture"
 )
 
@@ -34,6 +34,7 @@ type Options struct {
 	Framework string
 	Database  string
 	Queue     string
+	Search    string
 	Scheduler bool
 	SkipTidy  bool
 }
@@ -46,6 +47,7 @@ type Metadata struct {
 	Framework        string `json:"framework"`
 	Database         string `json:"database"`
 	Queue            string `json:"queue"`
+	Search           string `json:"search"`
 	Scheduler        bool   `json:"scheduler"`
 }
 
@@ -55,6 +57,10 @@ type Result struct {
 }
 
 func Generate(ctx context.Context, options Options) (Result, error) {
+	if options.Search == "" {
+		options.Search = "none"
+	}
+
 	if err := validate(options); err != nil {
 		return Result{}, err
 	}
@@ -133,6 +139,10 @@ func validate(options Options) error {
 		return fmt.Errorf("unsupported queue %q", options.Queue)
 	}
 
+	if !oneOf(options.Search, "none", "elasticsearch") {
+		return fmt.Errorf("unsupported search adapter %q", options.Search)
+	}
+
 	if options.Scheduler && options.Queue == "none" {
 		return errors.New("scheduler requires a database or redis queue")
 	}
@@ -158,6 +168,7 @@ func materialize(destination string, options Options) error {
 	} else {
 		overlays = append(overlays, "_assets/overlays/scheduler/disabled")
 	}
+	overlays = append(overlays, "_assets/overlays/search/"+options.Search)
 
 	for _, overlay := range overlays {
 		if err := applyOverlay(overlay, destination, options); err != nil {
@@ -179,7 +190,7 @@ func materialize(destination string, options Options) error {
 	metadata := Metadata{
 		SchemaVersion: 1, GeneratorVersion: GeneratorVersion, TemplateVersion: TemplateVersion,
 		Module: options.Module, Framework: options.Framework, Database: options.Database,
-		Queue: options.Queue, Scheduler: options.Scheduler,
+		Queue: options.Queue, Search: options.Search, Scheduler: options.Scheduler,
 	}
 	data, err := json.MarshalIndent(metadata, "", "  ")
 	if err != nil {
@@ -254,6 +265,15 @@ func configureGoMod(destination string, options Options) error {
 	if options.Queue == "redis" {
 		if err := file.AddRequire("github.com/hibiken/asynq", "v0.26.0"); err != nil {
 			return fmt.Errorf("add redis queue dependency: %w", err)
+		}
+	}
+
+	if err := file.DropRequire("github.com/elastic/go-elasticsearch/v8"); err != nil {
+		return fmt.Errorf("drop search dependency: %w", err)
+	}
+	if options.Search == "elasticsearch" {
+		if err := file.AddRequire("github.com/elastic/go-elasticsearch/v8", "v8.19.6"); err != nil {
+			return fmt.Errorf("add Elasticsearch dependency: %w", err)
 		}
 	}
 

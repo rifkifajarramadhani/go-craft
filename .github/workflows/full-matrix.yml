@@ -14,6 +14,7 @@ jobs:
         framework: [nethttp, fiber, gin, echo]
         database: [mysql, postgres, sqlite]
         queue: [none, database, redis]
+        search: [none, elasticsearch]
         scheduler: ['false', 'true']
         exclude:
           - { queue: none, scheduler: 'true' }
@@ -35,6 +36,7 @@ jobs:
             --framework='${{ matrix.framework }}' \
             --database='${{ matrix.database }}' \
             --queue='${{ matrix.queue }}' \
+            --search='${{ matrix.search }}' \
             "${scheduler[@]}" \
             --no-interaction
       - working-directory: ${{ runner.temp }}/generated

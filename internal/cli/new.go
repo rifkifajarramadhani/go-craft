@@ -22,6 +22,7 @@ type newOptions struct {
 	framework     string
 	database      string
 	queue         string
+	search        string
 	scheduler     bool
 	noInteraction bool
 	accessible    bool
@@ -30,7 +31,7 @@ type newOptions struct {
 
 func newCommand(store *configstore.Store) *cobra.Command {
 	options := newOptions{
-		directory: ".", framework: "fiber", database: "mysql", queue: "database",
+		directory: ".", framework: "fiber", database: "mysql", queue: "database", search: "none",
 	}
 
 	command := &cobra.Command{
@@ -48,6 +49,7 @@ func newCommand(store *configstore.Store) *cobra.Command {
 	flags.StringVar(&options.framework, "framework", "fiber", "HTTP framework: nethttp, fiber, gin, or echo")
 	flags.StringVar(&options.database, "database", "mysql", "Database: mysql, postgres, or sqlite")
 	flags.StringVar(&options.queue, "queue", "database", "Queue: none, database, or redis")
+	flags.StringVar(&options.search, "search", "none", "Search: none or elasticsearch")
 	flags.BoolVar(&options.scheduler, "scheduler", false, "Include the scheduler process")
 	flags.BoolVar(&options.noInteraction, "no-interaction", false, "Disable interactive prompts")
 	flags.BoolVar(&options.accessible, "accessible", false, "Use accessible line-oriented prompts")
@@ -96,7 +98,7 @@ func runNew(cmd *cobra.Command, store *configstore.Store, name string, options *
 	result, err := scaffold.Generate(cmd.Context(), scaffold.Options{
 		Name: name, Module: modulePath, Directory: options.directory,
 		Framework: options.framework, Database: options.database, Queue: options.queue,
-		Scheduler: options.scheduler, SkipTidy: options.skipTidy,
+		Search: options.search, Scheduler: options.scheduler, SkipTidy: options.skipTidy,
 	})
 	if err != nil {
 		return err
@@ -136,6 +138,10 @@ func runWizard(cmd *cobra.Command, options *newOptions, owner *string) error {
 			huh.NewOption("Database", "database"),
 			huh.NewOption("Redis", "redis"),
 		).Value(&options.queue),
+		huh.NewSelect[string]().Title("Search").Options(
+			huh.NewOption("None", "none"),
+			huh.NewOption("Elasticsearch", "elasticsearch"),
+		).Value(&options.search),
 	}
 
 	form := huh.NewForm(huh.NewGroup(fields...)).WithAccessible(options.accessible)

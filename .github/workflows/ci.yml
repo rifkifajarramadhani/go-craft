@@ -22,14 +22,14 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { framework: nethttp, database: mysql, queue: none, scheduler: '' }
-          - { framework: fiber, database: postgres, queue: database, scheduler: '' }
-          - { framework: gin, database: sqlite, queue: redis, scheduler: --scheduler }
-          - { framework: echo, database: mysql, queue: database, scheduler: --scheduler }
-          - { framework: nethttp, database: postgres, queue: redis, scheduler: '' }
-          - { framework: fiber, database: sqlite, queue: none, scheduler: '' }
-          - { framework: gin, database: mysql, queue: database, scheduler: --scheduler }
-          - { framework: echo, database: postgres, queue: none, scheduler: '' }
+          - { framework: nethttp, database: mysql, queue: none, search: none, scheduler: '' }
+          - { framework: fiber, database: postgres, queue: database, search: elasticsearch, scheduler: '' }
+          - { framework: gin, database: sqlite, queue: redis, search: none, scheduler: --scheduler }
+          - { framework: echo, database: mysql, queue: database, search: elasticsearch, scheduler: --scheduler }
+          - { framework: nethttp, database: postgres, queue: redis, search: elasticsearch, scheduler: '' }
+          - { framework: fiber, database: sqlite, queue: none, search: none, scheduler: '' }
+          - { framework: gin, database: mysql, queue: database, search: elasticsearch, scheduler: --scheduler }
+          - { framework: echo, database: postgres, queue: none, search: none, scheduler: '' }
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
@@ -44,12 +44,48 @@ jobs:
           --framework=${{ matrix.framework }}
           --database=${{ matrix.database }}
           --queue=${{ matrix.queue }}
+          --search=${{ matrix.search }}
           ${{ matrix.scheduler }}
           --no-interaction
       - working-directory: ${{ runner.temp }}/generated
         run: go test ./...
       - working-directory: ${{ runner.temp }}/generated
         run: go vet ./...
+
+  elasticsearch-adapter-integration:
+    runs-on: ubuntu-latest
+    services:
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.19.18
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: 'false'
+          xpack.security.http.ssl.enabled: 'false'
+        ports:
+          - 9200:9200
+        options: >-
+          --health-cmd "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' >/dev/null"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.4'
+          cache: true
+      - run: go build -o go-craft ./cmd/go-craft
+      - run: >-
+          ./go-craft new elasticsearch-project
+          --module=example.com/elasticsearch-project
+          --directory=${{ runner.temp }}
+          --framework=nethttp
+          --database=sqlite
+          --queue=none
+          --search=elasticsearch
+          --no-interaction
+      - working-directory: ${{ runner.temp }}/elasticsearch-project
+        env:
+          ELASTICSEARCH_TEST_URL: http://localhost:9200
+        run: go test ./internal/adapter/elasticsearch -run Integration -count=1
 
   database-queue-integration:
     runs-on: ubuntu-latest

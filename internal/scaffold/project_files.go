@@ -9,6 +9,7 @@ import (
 
 func configureProjectFiles(destination string, options Options) error {
 	files := map[string]string{
+		".env.example":        environmentExample(options),
 		"Makefile":            makefile(options),
 		"Dockerfile":          dockerfile(options),
 		"docker-compose.yml":  compose(options),
@@ -26,6 +27,26 @@ func configureProjectFiles(destination string, options Options) error {
 	}
 
 	return nil
+}
+
+func environmentExample(options Options) string {
+	value := `# Copy this file to .env for local development. Never commit real credentials.
+APP_ENVIRONMENT=development
+
+DATABASE_PASSWORD=local-development-only
+AUTH_JWT_ACCESS_SECRET=local-access-secret-change-me
+AUTH_JWT_REFRESH_SECRET=local-refresh-secret-change-me
+REDIS_PASSWORD=
+MAIL_PASSWORD=
+`
+	if options.Search == "elasticsearch" {
+		value += `ELASTICSEARCH_URL=http://elasticsearch:9200
+ELASTICSEARCH_USERNAME=
+ELASTICSEARCH_PASSWORD=
+`
+	}
+
+	return value
 }
 
 func makefile(options Options) string {
@@ -171,6 +192,15 @@ redis:
 	if options.Scheduler {
 		scheduler = "\nscheduler:\n  timezone: UTC\n"
 	}
+	elasticsearch := ""
+	if options.Search == "elasticsearch" {
+		elasticsearch = `
+elasticsearch:
+  url: http://elasticsearch:9200
+  username: ""
+  password: ""
+`
+	}
 
 	return fmt.Sprintf(`app:
   port: 8080
@@ -179,6 +209,7 @@ redis:
 database:
 %s
 
+%s
 auth:
   jwt_access_secret: ""
   jwt_refresh_secret: ""
@@ -204,7 +235,7 @@ mail:
 logging:
   level: info
   file: logs/app.log
-`, database, options.Name, options.Name, redis, queue, scheduler, options.Name)
+`, database, elasticsearch, options.Name, options.Name, redis, queue, scheduler, options.Name)
 }
 
 func compose(options Options) string {
@@ -230,6 +261,15 @@ func compose(options Options) string {
 		environment += "      REDIS_ADDRESS: redis:6379\n"
 	}
 
+	serverEnvironment := environment
+	elasticsearchDependency := ""
+	elasticsearchService := ""
+	if options.Search == "elasticsearch" {
+		elasticsearchDependency = "      elasticsearch:\n        condition: service_healthy\n"
+		elasticsearchService = elasticsearchComposeService
+		serverEnvironment += "      ELASTICSEARCH_URL: http://elasticsearch:9200\n"
+	}
+
 	worker := ""
 	if options.Queue != "none" {
 		worker = fmt.Sprintf(workerService, options.Queue, environment, depends+redisDependency)
@@ -239,9 +279,15 @@ func compose(options Options) string {
 		scheduler = fmt.Sprintf(schedulerService, options.Queue, environment, composeDependencies(depends+redisDependency))
 	}
 
-	volumes := "volumes:\n  db_data:\n"
-	if options.Database == "sqlite" {
-		volumes = ""
+	volumes := ""
+	if options.Database != "sqlite" || options.Search == "elasticsearch" {
+		volumes = "volumes:\n"
+		if options.Database != "sqlite" {
+			volumes += "  db_data:\n"
+		}
+		if options.Search == "elasticsearch" {
+			volumes += "  elasticsearch_data:\n"
+		}
 	}
 
 	return fmt.Sprintf(`%s
@@ -263,7 +309,7 @@ services:
 %s      mailpit:
         condition: service_healthy
 
-%s%s%s%s  mailpit:
+%s%s%s%s%s  mailpit:
     image: axllent/mailpit:v1.27.8
     ports:
       - "1025:1025"
@@ -273,7 +319,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
-`, volumes, environment, depends+redisDependency, worker, scheduler, databaseService, redisService)
+`, volumes, serverEnvironment, depends+redisDependency+elasticsearchDependency, worker, scheduler, databaseService, redisService, elasticsearchService)
 }
 
 func composeDependencies(services string) string {
@@ -285,7 +331,10 @@ func composeDependencies(services string) string {
 }
 
 func readme(options Options) string {
-	components := []string{"HTTP: `" + options.Framework + "`", "database: `" + options.Database + "`", "queue: `" + options.Queue + "`"}
+	components := []string{
+		"HTTP: `" + options.Framework + "`", "database: `" + options.Database + "`",
+		"queue: `" + options.Queue + "`", "search: `" + options.Search + "`",
+	}
 	if options.Scheduler {
 		components = append(components, "scheduler: enabled")
 	}
@@ -296,6 +345,13 @@ func readme(options Options) string {
 	}
 	if options.Scheduler {
 		commands += "\ngo run ./cmd/app scheduler"
+	}
+	searchDocumentation := ""
+	if options.Search == "elasticsearch" {
+		searchDocumentation = "\n## Elasticsearch\n\n" +
+			"The HTTP process verifies Elasticsearch at startup and includes it in `/health/ready`. " +
+			"The local Compose service disables authentication and TLS for development only. Configure " +
+			"`ELASTICSEARCH_URL`, `ELASTICSEARCH_USERNAME`, and `ELASTICSEARCH_PASSWORD` for secured remote deployments.\n"
 	}
 
 	return fmt.Sprintf(`# %s
@@ -312,7 +368,7 @@ make migrate
 ~~~
 
 The project keeps domain and application logic independent from transport and persistence adapters. The generated source, dependencies, configuration, containers, and commands contain only the selected adapters.
-`, options.Name, strings.Join(components, ", "), commands)
+%s`, options.Name, strings.Join(components, ", "), commands, searchDocumentation)
 }
 
 const mysqlService = `  db:
@@ -353,6 +409,24 @@ const redisComposeService = `  redis:
       interval: 5s
       timeout: 3s
       retries: 20
+
+`
+
+const elasticsearchComposeService = `  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.18
+    ports:
+      - "9200:9200"
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.http.ssl.enabled: "false"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS 'http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=5s' >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
 
 `
 

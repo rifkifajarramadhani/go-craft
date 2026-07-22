@@ -1,4 +1,4 @@
-TEMPLATE_VERSION ?= 0.1.0
+TEMPLATE_VERSION ?= 0.2.0
 TEMPLATE_ARCHIVE ?= ../golang-clean-architecture/dist/golang-clean-architecture-template-$(TEMPLATE_VERSION).tar.gz
 TEMPLATE_CHECKSUM ?= $(TEMPLATE_ARCHIVE).sha256
 
@@ -24,4 +24,3 @@ update-template:
 	tar -xzf "$(TEMPLATE_ARCHIVE)" -C internal/scaffold/_assets/template
 	mv internal/scaffold/_assets/template/go.mod internal/scaffold/_assets/template/go.mod.tmpl
 	gofmt -w internal/scaffold/_assets/template
-
