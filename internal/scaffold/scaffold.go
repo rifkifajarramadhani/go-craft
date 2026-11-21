@@ -217,7 +217,7 @@ func configureGoMod(destination string, options Options) error {
 	}
 
 	for _, dependency := range []string{
-		"github.com/gofiber/fiber/v3", "github.com/gin-gonic/gin", "github.com/labstack/echo/v4",
+		"github.com/gofiber/fiber/v3", "github.com/gin-gonic/gin", "github.com/labstack/echo/v5",
 	} {
 		if err := file.DropRequire(dependency); err != nil {
 			return fmt.Errorf("drop framework dependency %s: %w", dependency, err)
@@ -232,7 +232,7 @@ func configureGoMod(destination string, options Options) error {
 			err = file.AddRequire("github.com/quic-go/quic-go", "v0.59.1")
 		}
 	case "echo":
-		err = file.AddRequire("github.com/labstack/echo/v4", "v4.15.4")
+		err = file.AddRequire("github.com/labstack/echo/v5", "v5.4.7")
 	}
 	if err != nil {
 		return fmt.Errorf("add selected framework dependency: %w", err)

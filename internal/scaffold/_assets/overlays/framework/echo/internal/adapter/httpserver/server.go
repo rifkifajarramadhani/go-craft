@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo/v5"
+	"github.com/labstack/echo/v5/middleware"
 )
 
 type Server struct {
@@ -18,17 +18,19 @@ type Server struct {
 
 func New(port string, handler http.Handler, logger *slog.Logger) *Server {
 	e := echo.New()
-	e.HideBanner = true
-	e.HidePort = true
 	e.Use(
 		middleware.Recover(),
 		middleware.RequestID(),
 		middleware.Secure(),
-		middleware.BodyLimit("64K"),
+		middleware.BodyLimit(64<<10),
 		requestLogger(logger),
 		rateLimit(20, time.Minute),
 	)
-	e.Any("/*", echo.WrapHandler(handler))
+	// Echo v5 Any accepts arbitrary methods. Keep the methods accepted by the v4 router.
+	e.Match([]string{
+		http.MethodConnect, http.MethodDelete, http.MethodGet, http.MethodHead, http.MethodOptions,
+		http.MethodPatch, http.MethodPost, echo.PROPFIND, http.MethodPut, http.MethodTrace, echo.REPORT,
+	}, "/*", echo.WrapHandler(handler))
 
 	return &Server{server: &http.Server{
 		Addr: ":" + port, Handler: e,
@@ -58,14 +60,20 @@ func (s *Server) Run(ctx context.Context) error {
 
 func requestLogger(logger *slog.Logger) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			started := time.Now()
 
 			err := next(c)
+
 			if logger != nil {
+				status := 0
+				if response, unwrapErr := echo.UnwrapResponse(c.Response()); unwrapErr == nil {
+					status = response.Status
+				}
+
 				logger.InfoContext(c.Request().Context(), "http request", "request_id", c.Response().Header().Get(echo.HeaderXRequestID),
 					"method", c.Request().Method, "path", c.Request().URL.Path,
-					"status", c.Response().Status, "duration", time.Since(started))
+					"status", status, "duration", time.Since(started))
 			}
 
 			return err
@@ -81,7 +89,7 @@ func rateLimit(maximum int, window time.Duration) echo.MiddlewareFunc {
 	)
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
+		return func(c *echo.Context) error {
 			path := c.Request().URL.Path
 			if len(path) < len("/api/auth/") || path[:len("/api/auth/")] != "/api/auth/" {
 				return next(c)

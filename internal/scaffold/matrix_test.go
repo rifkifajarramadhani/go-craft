@@ -88,7 +88,7 @@ func assertSelection(t *testing.T, destination string, options Options) {
 	frameworkModules := map[string]string{
 		"fiber": "github.com/gofiber/fiber/v3",
 		"gin":   "github.com/gin-gonic/gin",
-		"echo":  "github.com/labstack/echo/v4",
+		"echo":  "github.com/labstack/echo/v5",
 	}
 	for framework, modulePath := range frameworkModules {
 		want := framework == options.Framework
