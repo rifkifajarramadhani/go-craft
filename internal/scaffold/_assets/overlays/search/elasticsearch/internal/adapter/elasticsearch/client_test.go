@@ -22,7 +22,7 @@ func TestOpenChecksClusterAndSendsBasicAuth(t *testing.T) {
 		}
 
 		writer.Header().Set("X-Elastic-Product", "Elasticsearch")
-		_, _ = io.WriteString(writer, `{"version":{"number":"8.19.18"}}`)
+		_, _ = io.WriteString(writer, `{"version":{"number":"8.19.25"}}`)
 	}))
 	defer server.Close()
 

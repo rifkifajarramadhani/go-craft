@@ -51,12 +51,15 @@ jobs:
         run: go test ./...
       - working-directory: ${{ runner.temp }}/generated
         run: go vet ./...
+      - run: go install golang.org/x/vuln/cmd/govulncheck@v1.10.0
+      - working-directory: ${{ runner.temp }}/generated
+        run: govulncheck ./...
 
   elasticsearch-adapter-integration:
     runs-on: ubuntu-latest
     services:
       elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:8.19.18
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.19.25
         env:
           discovery.type: single-node
           xpack.security.enabled: 'false'

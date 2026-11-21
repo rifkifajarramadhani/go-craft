@@ -274,7 +274,7 @@ func configureGoMod(destination string, options Options) error {
 		return fmt.Errorf("drop search dependency: %w", err)
 	}
 	if options.Search == "elasticsearch" {
-		if err := file.AddRequire("github.com/elastic/go-elasticsearch/v8", "v8.19.6"); err != nil {
+		if err := file.AddRequire("github.com/elastic/go-elasticsearch/v8", "v8.19.7"); err != nil {
 			return fmt.Errorf("add Elasticsearch dependency: %w", err)
 		}
 	}

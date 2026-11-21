@@ -46,6 +46,22 @@ Generation happens in a staging directory. Source is formatted before the destin
 
 In the starter repository, `make template-pack` produces a deterministic, versioned tarball and SHA-256 file. In this repository, `make update-template` verifies that checksum before replacing the embedded snapshot. `go-craft new` performs no template downloads.
 
+### Elasticsearch 9.x migration
+
+Migrate the search adapter before Elasticsearch 8.x maintenance ends on
+January 15, 2027. [Elastic lifecycle dates](https://www.elastic.co/support/eol)
+
+1. Bring a staging cluster to the latest 8.19 patch. Take a snapshot and
+   verify that it restores to an 8.19 cluster. Resolve Upgrade Assistant
+   blockers, including any indices that need reindexing.
+   [Elastic upgrade preparation](https://www.elastic.co/docs/deploy-manage/upgrade/prepare-to-upgrade)
+2. Test the 8.x Go client against a supported 9.x server in REST compatibility
+   mode. Run the adapter integration tests before and after switching to the
+   9.x Go client.
+   [Elastic REST compatibility](https://www.elastic.co/docs/reference/elasticsearch/rest-apis/compatibility)
+3. Update the generated Compose image, the Go client, and the CI integration
+   image together. Document the upgrade steps for existing generated projects.
+
 ## Verification
 
 ```sh

@@ -413,7 +413,7 @@ const redisComposeService = `  redis:
 `
 
 const elasticsearchComposeService = `  elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.18
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.25
     ports:
       - "9200:9200"
     environment:
