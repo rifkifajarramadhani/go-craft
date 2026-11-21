@@ -27,7 +27,7 @@ func TestDatabaseQueueDispatchReserveAndComplete(t *testing.T) {
 		t.Skip("QUEUE_TEST_MYSQL_DSN is not set")
 	}
 
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{TranslateError: true})
 	if err != nil {
 		t.Fatal(err)
 	}
