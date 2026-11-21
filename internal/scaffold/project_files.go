@@ -279,15 +279,15 @@ func compose(options Options) string {
 		scheduler = fmt.Sprintf(schedulerService, options.Queue, environment, composeDependencies(depends+redisDependency))
 	}
 
-	volumes := ""
-	if options.Database != "sqlite" || options.Search == "elasticsearch" {
-		volumes = "volumes:\n"
-		if options.Database != "sqlite" {
-			volumes += "  db_data:\n"
-		}
-		if options.Search == "elasticsearch" {
-			volumes += "  elasticsearch_data:\n"
-		}
+	// go_build_cache/go_mod_cache are shared by the Go dev services so rebuilds
+	// reuse one compile cache (the Go cache is concurrency-safe) and it
+	// survives container recreates.
+	volumes := "volumes:\n  go_build_cache:\n  go_mod_cache:\n"
+	if options.Database != "sqlite" {
+		volumes += "  db_data:\n"
+	}
+	if options.Search == "elasticsearch" {
+		volumes += "  elasticsearch_data:\n"
 	}
 
 	return fmt.Sprintf(`%s
@@ -302,6 +302,8 @@ services:
       - "8080:8080"
     volumes:
       - .:/app
+      - go_build_cache:/root/.cache/go-build
+      - go_mod_cache:/go/pkg/mod
     env_file:
       - ${ENV_FILE:-.env}
     environment:
@@ -438,6 +440,8 @@ const workerService = `  worker:
     command: air -c .air.worker.toml
     volumes:
       - .:/app
+      - go_build_cache:/root/.cache/go-build
+      - go_mod_cache:/go/pkg/mod
     env_file:
       - ${ENV_FILE:-.env}
     environment:
@@ -456,6 +460,8 @@ const schedulerService = `  scheduler:
     command: go run ./cmd/app scheduler
     volumes:
       - .:/app
+      - go_build_cache:/root/.cache/go-build
+      - go_mod_cache:/go/pkg/mod
     env_file:
       - ${ENV_FILE:-.env}
     environment:
