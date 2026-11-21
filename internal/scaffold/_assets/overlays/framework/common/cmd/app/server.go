@@ -26,6 +26,7 @@ func runServer(ctx context.Context, cfg *config.Config, logger *logging.Logger, 
 		defer cancel()
 
 		sqlDB, err := db.DB()
+
 		return err == nil && sqlDB.PingContext(readyCtx) == nil && searchReady(readyCtx) == nil
 	}
 	api := httpapi.New(services.Users, services.Auth, services.Tokens, logger.Logger, ready)
