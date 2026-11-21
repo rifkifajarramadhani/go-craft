@@ -18,7 +18,7 @@ HTTP choices are `nethttp`, `fiber`, `gin`, and `echo`; databases are `mysql`, `
 
 ## Tech Stack
 
-- **Language:** Go 1.26
+- **Language:** Go 1.27
 - **HTTP Framework:** Fiber v3
 - **Database:** MySQL 8 (Docker)
 - **Queue:** MySQL database queue by default; Redis + Asynq is also supported

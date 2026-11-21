@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Backend services boilerplate built with Clean Architecture principles: a single `cmd/app` binary whose subcommands provide independently deployable HTTP API (`serve`), queue worker (`worker`), and scheduler (`scheduler`) roles — or all three in one process (`all`) — plus `queue`/`schedule` operator CLIs. Go 1.26, Fiber v3, GORM/MySQL, Redis or MySQL-backed queue (Asynq), Viper config, golang-migrate, Air hot reload.
+Backend services boilerplate built with Clean Architecture principles: a single `cmd/app` binary whose subcommands provide independently deployable HTTP API (`serve`), queue worker (`worker`), and scheduler (`scheduler`) roles — or all three in one process (`all`) — plus `queue`/`schedule` operator CLIs. Go 1.27, Fiber v3, GORM/MySQL, Redis or MySQL-backed queue (Asynq), Viper config, golang-migrate, Air hot reload.
 
 Detailed agent guidance already lives in these files — read them, don't duplicate them here:
 
