@@ -6,6 +6,9 @@ import (
 	"net/mail"
 	"regexp"
 	"strings"
+	"unicode"
+
+	"golang.org/x/text/unicode/rangetable"
 )
 
 const (
@@ -226,8 +229,18 @@ func ValidatePassword(password string) error {
 	return nil
 }
 
+// NormalizeEmail preserves the lowercase lookup keys created with Unicode 15.0.0.
 func NormalizeEmail(email string) string {
-	return strings.ToLower(strings.TrimSpace(email))
+	assigned := rangetable.Assigned("15.0.0")
+
+	return strings.Map(func(character rune) rune {
+		lower := unicode.ToLower(character)
+		if character > unicode.MaxASCII && lower != character && !unicode.Is(assigned, character) {
+			return character
+		}
+
+		return lower
+	}, strings.TrimSpace(email))
 }
 
 func NormalizePagination(page, limit int) (int, int) {

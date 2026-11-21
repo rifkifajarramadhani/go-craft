@@ -71,6 +71,15 @@ func TestServiceCreatesNormalizedUserWithHashedPassword(t *testing.T) {
 	}
 }
 
+func TestNormalizeEmailRetainsExistingLookupKey(t *testing.T) {
+	input := " É\u1C89\uA7CB\U00010D50\U00016EA0@EXAMPLE.COM "
+	want := "é\u1C89\uA7CB\U00010D50\U00016EA0@example.com"
+
+	if got := NormalizeEmail(input); got != want {
+		t.Fatalf("NormalizeEmail(%q) = %q, want %q", input, got, want)
+	}
+}
+
 func TestServiceRejectsInvalidInput(t *testing.T) {
 	service := NewService(&repositoryFake{}, passwordFake{})
 	for _, account := range []*User{

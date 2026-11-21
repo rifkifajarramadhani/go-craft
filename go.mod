@@ -5,7 +5,7 @@ go 1.27.4
 require (
 	charm.land/huh/v2 v2.0.3
 	github.com/spf13/cobra v1.10.2
-	golang.org/x/mod v0.38.0
+	golang.org/x/mod v0.43.0
 )
 
 require (

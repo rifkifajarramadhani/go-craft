@@ -226,9 +226,11 @@ func configureGoMod(destination string, options Options) error {
 
 	switch options.Framework {
 	case "fiber":
-		err = file.AddRequire("github.com/gofiber/fiber/v3", "v3.4.0")
+		err = file.AddRequire("github.com/gofiber/fiber/v3", "v3.7.0")
 	case "gin":
-		err = file.AddRequire("github.com/gin-gonic/gin", "v1.12.0")
+		if err = file.AddRequire("github.com/gin-gonic/gin", "v1.12.0"); err == nil {
+			err = file.AddRequire("github.com/quic-go/quic-go", "v0.59.1")
+		}
 	case "echo":
 		err = file.AddRequire("github.com/labstack/echo/v4", "v4.15.4")
 	}
@@ -251,7 +253,7 @@ func configureGoMod(destination string, options Options) error {
 			err = file.AddRequire("gorm.io/driver/mysql", "v1.6.0")
 		}
 	case "postgres":
-		err = file.AddRequire("gorm.io/driver/postgres", "v1.6.0")
+		err = file.AddRequire("gorm.io/driver/postgres", "v1.6.3")
 	case "sqlite":
 		err = file.AddRequire("github.com/ncruces/go-sqlite3/gormlite", "v0.34.0")
 	}
